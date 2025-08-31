@@ -1,0 +1,23 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scraper-headless-worker-scaler
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: scraper-headless-worker
+spec:
+  scaleTargetRef:
+    name: scraper-headless-worker
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+  - type: redis-streams
+    metadata:
+      address: redis:6379
+      stream: scrape_headless
+      consumerGroup: headless_workers
+      pendingEntriesCount: "5"
+      activationPendingEntriesCount: "1"

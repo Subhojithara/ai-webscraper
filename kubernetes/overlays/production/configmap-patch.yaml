@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k-scrape-nexus-config
+  namespace: k-scrape-nexus-production
+data:
+  # Production-specific overrides
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  
+  # Production resource settings
+  WORKER_CONCURRENCY: "20"
+  WORKER_TIMEOUT: "600"
+  
+  # Production database and Redis
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "40"
+  REDIS_MAX_CONNECTIONS: "100"
+  
+  # Production scraping settings
+  SCRAPING_TIMEOUT: "60"
+  RATE_LIMIT_RPS: "20.0"
+  RATE_LIMIT_BURST: "50"
+  
+  # Production file processing
+  MAX_FILE_SIZE_MB: "500"
+  
+  # Enhanced retry settings
+  WORKER_RETRY_ATTEMPTS: "5"
+  WORKER_RETRY_DELAY: "120"

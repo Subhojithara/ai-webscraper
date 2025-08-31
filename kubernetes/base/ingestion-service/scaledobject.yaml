@@ -1,0 +1,30 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ingestion-service-scaler
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: ingestion-service
+spec:
+  scaleTargetRef:
+    name: ingestion-service
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+  - type: redis-streams
+    metadata:
+      address: redis:6379
+      stream: new_files
+      consumerGroup: ingestion_workers
+      pendingEntriesCount: "5"
+      activationPendingEntriesCount: "1"
+  - type: redis-streams
+    metadata:
+      address: redis:6379
+      stream: failed_files
+      consumerGroup: ingestion_workers
+      pendingEntriesCount: "10"
+      activationPendingEntriesCount: "1"

@@ -1,0 +1,68 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: k-scrape-nexus
+
+resources:
+  # Shared resources
+  - shared/namespace.yaml
+  - shared/configmap.yaml
+  - shared/secrets.sops.yaml
+  - shared/rbac.yaml
+  
+  # API Server
+  - api-server/deployment.yaml
+  - api-server/service.yaml
+  - api-server/networkpolicy.yaml
+  - api-server/hpa.yaml
+  
+  # Ingestion Service
+  - ingestion-service/deployment.yaml
+  - ingestion-service/networkpolicy.yaml
+  - ingestion-service/scaledobject.yaml
+  
+  # HTTP Scraper Worker
+  - scraper-http-worker/deployment.yaml
+  - scraper-http-worker/networkpolicy.yaml
+  - scraper-http-worker/scaledobject.yaml
+  
+  # Headless Scraper Worker
+  - scraper-headless-worker/deployment.yaml
+  - scraper-headless-worker/networkpolicy.yaml
+  - scraper-headless-worker/scaledobject.yaml
+  
+  # Crawl4AI Scraper Worker
+  - crawl4ai-scraper-worker/deployment.yaml
+  - crawl4ai-scraper-worker/service.yaml
+  - crawl4ai-scraper-worker/networkpolicy.yaml
+  - crawl4ai-scraper-worker/scaledobject.yaml
+  
+  # Data Processing Worker
+  - processing-worker/deployment.yaml
+  - processing-worker/networkpolicy.yaml
+  - processing-worker/scaledobject.yaml
+  
+  # Job Coordinator
+  - coordinator/deployment.yaml
+  - coordinator/service.yaml
+
+images:
+  - name: k-scrape-nexus/api-server
+    newTag: 1.0.0
+  - name: k-scrape-nexus/ingestion-service
+    newTag: 1.0.0
+  - name: k-scrape-nexus/http-scraper-worker
+    newTag: 1.0.0
+  - name: k-scrape-nexus/headless-scraper-worker
+    newTag: 1.0.0
+  - name: k-scrape-nexus/crawl4ai-scraper-worker
+    newTag: 1.0.0
+  - name: k-scrape-nexus/data-processing-worker
+    newTag: 1.0.0
+  - name: k-scrape-nexus/coordinator
+    newTag: 1.0.0
+
+commonLabels:
+  app.kubernetes.io/name: k-scrape-nexus
+  app.kubernetes.io/version: "1.0.0"
+  app.kubernetes.io/managed-by: kustomize

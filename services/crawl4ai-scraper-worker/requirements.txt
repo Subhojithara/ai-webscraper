@@ -1,0 +1,13 @@
+# K-Scrape Nexus Crawl4AI Scraper Worker Dependencies
+
+crawl4ai>=0.7.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+structlog>=23.2.0
+prometheus-client>=0.19.0
+redis>=5.0.0
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0
+boto3>=1.34.0
+pydantic>=2.5.0
+httpx>=0.25.0

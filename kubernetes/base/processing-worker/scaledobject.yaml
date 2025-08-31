@@ -1,0 +1,23 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: processing-worker-scaler
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: processing-worker
+spec:
+  scaleTargetRef:
+    name: processing-worker
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+  - type: redis-streams
+    metadata:
+      address: redis:6379
+      stream: needs_cleaning
+      consumerGroup: processing_workers
+      pendingEntriesCount: "10"
+      activationPendingEntriesCount: "2"

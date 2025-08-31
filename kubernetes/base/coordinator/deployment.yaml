@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coordinator
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: coordinator
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: k-scrape-nexus
+      app.kubernetes.io/component: coordinator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k-scrape-nexus
+        app.kubernetes.io/component: coordinator
+        app.kubernetes.io/version: "1.0.0"
+    spec:
+      serviceAccountName: k-scrape-nexus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: coordinator
+        image: k-scrape-nexus/coordinator:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 8006
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: k-scrape-nexus-config
+        - secretRef:
+            name: k-scrape-nexus-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coordinator
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: coordinator
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 8006
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: coordinator

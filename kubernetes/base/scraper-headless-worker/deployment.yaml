@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scraper-headless-worker
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: scraper-headless-worker
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: k-scrape-nexus
+      app.kubernetes.io/component: scraper-headless-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k-scrape-nexus
+        app.kubernetes.io/component: scraper-headless-worker
+        app.kubernetes.io/version: "1.0.0"
+    spec:
+      serviceAccountName: k-scrape-nexus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: scraper-headless-worker
+        image: k-scrape-nexus/headless-scraper-worker:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 8004
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: k-scrape-nexus-config
+        - secretRef:
+            name: k-scrape-nexus-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 512Mi
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scraper-headless-worker-network-policy
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: scraper-headless-worker
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k-scrape-nexus
+      app.kubernetes.io/component: scraper-headless-worker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow metrics scraping from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8004
+  egress:
+  # Allow egress to PostgreSQL, Redis, S3, DNS, and web
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9000
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scraper-headless-worker-scaler
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: scraper-headless-worker
+spec:
+  scaleTargetRef:
+    name: scraper-headless-worker
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+  - type: redis-streams
+    metadata:
+      address: redis:6379
+      stream: scrape_headless
+      consumerGroup: headless_workers
+      pendingEntriesCount: "5"
+      activationPendingEntriesCount: "1"

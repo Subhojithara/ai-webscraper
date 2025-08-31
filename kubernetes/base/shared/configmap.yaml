@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k-scrape-nexus-config
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: config
+data:
+  # Application configuration
+  APP_NAME: "k-scrape-nexus"
+  APP_VERSION: "1.0.0"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  
+  # Database configuration
+  DATABASE_POOL_SIZE: "10"
+  DATABASE_MAX_OVERFLOW: "20"
+  
+  # Redis configuration
+  REDIS_MAX_CONNECTIONS: "50"
+  
+  # S3 configuration
+  S3_REGION: "us-east-1"
+  
+  # Queue configuration
+  QUEUE_NEW_FILES: "new_files"
+  QUEUE_SCRAPE_HTTP: "scrape_http"
+  QUEUE_SCRAPE_HEADLESS: "scrape_headless"
+  QUEUE_SCRAPE_CRAWL4AI: "scrape_crawl4ai"
+  QUEUE_PROCESS_DATA: "process_data"
+  QUEUE_FAILED_TASKS: "failed_tasks"
+  
+  # Worker configuration
+  WORKER_CONCURRENCY: "10"
+  WORKER_TIMEOUT: "300"
+  WORKER_RETRY_ATTEMPTS: "3"
+  WORKER_RETRY_DELAY: "60"
+  
+  # Scraping configuration
+  SCRAPING_TIMEOUT: "30"
+  SCRAPING_MAX_REDIRECTS: "10"
+  SCRAPING_USER_AGENTS: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36,Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36,Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  
+  # Proxy configuration
+  PROXY_ENABLED: "false"
+  PROXY_ROTATION_ENABLED: "true"
+  
+  # Rate limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_RPS: "10.0"
+  RATE_LIMIT_BURST: "20"
+  
+  # Monitoring configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "8080"
+  TRACING_ENABLED: "true"
+  
+  # File processing
+  MAX_FILE_SIZE_MB: "100"
+  SUPPORTED_FILE_EXTENSIONS: ".txt,.csv,.json,.xlsx,.xls"

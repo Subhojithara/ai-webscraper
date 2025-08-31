@@ -1,0 +1,28 @@
+# Headless Scraper Worker Dependencies
+# Core framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Headless browser automation
+playwright>=1.40.0
+
+# HTTP client
+httpx>=0.25.0
+
+# HTML parsing
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Data processing
+pandas>=2.1.0
+
+# Async and concurrency
+asyncio-mqtt>=0.13.0
+
+# Logging and monitoring
+structlog>=23.2.0
+prometheus-client>=0.19.0
+
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0

@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scraper-headless-worker-network-policy
+  namespace: k-scrape-nexus
+  labels:
+    app.kubernetes.io/name: k-scrape-nexus
+    app.kubernetes.io/component: scraper-headless-worker
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k-scrape-nexus
+      app.kubernetes.io/component: scraper-headless-worker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow metrics scraping from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8004
+  egress:
+  # Allow all egress for headless browser functionality
+  - to: []

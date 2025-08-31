@@ -1,0 +1,272 @@
+# GitLab CI/CD Pipeline for K-Scrape Nexus
+# Complete CI/CD pipeline with build, test, security scan, and deployment stages
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  REGISTRY: $CI_REGISTRY
+  PROJECT_NAME: k-scrape-nexus
+  STAGING_NAMESPACE: k-scrape-nexus-staging
+  PRODUCTION_NAMESPACE: k-scrape-nexus-production
+
+stages:
+  - validate
+  - test
+  - build
+  - security
+  - deploy-staging
+  - deploy-production
+
+# Base image with Docker and tools
+.docker-base: &docker-base
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  before_script:
+    - docker info
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+
+# Validation stage
+lint-yaml:
+  stage: validate
+  image: cytopia/yamllint:1.28
+  script:
+    - yamllint kubernetes/
+    - yamllint docker-compose.yml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+validate-kustomize:
+  stage: validate
+  image: k8s.gcr.io/kustomize/kustomize:v5.0.1
+  script:
+    - kustomize build kubernetes/overlays/staging > /dev/null
+    - kustomize build kubernetes/overlays/production > /dev/null
+    - echo "Kustomize validation passed"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Test stage
+unit-tests:
+  stage: test
+  image: python:3.11-slim
+  services:
+    - postgres:15-alpine
+    - redis:7-alpine
+  variables:
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_password
+    DATABASE_URL: postgresql+asyncpg://test_user:test_password@postgres:5432/test_db
+    REDIS_URL: redis://redis:6379/1
+    SECRET_KEY: test-secret-key
+    S3_BUCKET: test-bucket
+    AWS_ACCESS_KEY_ID: test-key
+    AWS_SECRET_ACCESS_KEY: test-secret
+  before_script:
+    - apt-get update && apt-get install -y gcc
+    - pip install --upgrade pip
+    - pip install -e ./services/worker-shared/
+    - pip install pytest pytest-asyncio pytest-mock httpx beautifulsoup4
+  script:
+    - cd services/worker-shared && python -m pytest tests/ -v --tb=short
+    - echo "Unit tests completed"
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+integration-tests:
+  stage: test
+  image: python:3.11-slim
+  services:
+    - postgres:15-alpine
+    - redis:7-alpine
+    - minio/minio:latest
+  variables:
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_password
+    DATABASE_URL: postgresql+asyncpg://test_user:test_password@postgres:5432/test_db
+    REDIS_URL: redis://redis:6379/1
+    S3_ENDPOINT_URL: http://minio:9000
+    S3_BUCKET: test-bucket
+    AWS_ACCESS_KEY_ID: minioadmin
+    AWS_SECRET_ACCESS_KEY: minioadmin
+    SECRET_KEY: test-secret-key
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin
+  before_script:
+    - apt-get update && apt-get install -y gcc curl
+    - pip install --upgrade pip
+    - pip install -e ./services/worker-shared/
+    - pip install pytest pytest-asyncio pytest-mock httpx beautifulsoup4 boto3
+    # Wait for services to be ready
+    - sleep 10
+  script:
+    - python -m pytest tests/integration/ -v --tb=short
+    - echo "Integration tests completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Build stage
+build-images:
+  <<: *docker-base
+  stage: build
+  script:
+    - export VERSION=${CI_COMMIT_SHORT_SHA}
+    - chmod +x ci/build-images.sh
+    - ./ci/build-images.sh --registry $REGISTRY --version $VERSION --push
+  artifacts:
+    reports:
+      dotenv: build.env
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Security stage
+security-scan:
+  stage: security
+  image: aquasec/trivy:latest
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: ".trivycache/"
+  cache:
+    paths:
+      - .trivycache/
+  script:
+    - export VERSION=${CI_COMMIT_SHORT_SHA}
+    # Scan each service image
+    - |
+      for service in api-server ingestion-service http-scraper-worker headless-scraper-worker data-processing-worker coordinator; do
+        echo "Scanning $service..."
+        trivy image --exit-code 0 --severity HIGH,CRITICAL --format template --template "@contrib/sarif.tpl" -o ${service}-security-report.sarif $REGISTRY/$PROJECT_NAME/$service:$VERSION
+        trivy image --exit-code 1 --severity CRITICAL $REGISTRY/$PROJECT_NAME/$service:$VERSION
+      done
+  artifacts:
+    reports:
+      sast:
+        - "*-security-report.sarif"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Staging deployment
+deploy-staging:
+  stage: deploy-staging
+  image: bitnami/kubectl:latest
+  environment:
+    name: staging
+    url: https://staging.k-scrape-nexus.com
+  variables:
+    ENVIRONMENT: staging
+    VERSION: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    # Configure kubectl
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG_STAGING" | base64 -d > ~/.kube/config
+    - kubectl config current-context
+  script:
+    - chmod +x ci/deploy.sh
+    - ./ci/deploy.sh --environment staging --version $VERSION
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+  dependencies:
+    - build-images
+
+# Production deployment
+deploy-production:
+  stage: deploy-production
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://k-scrape-nexus.com
+  variables:
+    ENVIRONMENT: production
+    VERSION: ${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}
+  before_script:
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    # Configure kubectl
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG_PRODUCTION" | base64 -d > ~/.kube/config
+    - kubectl config current-context
+  script:
+    - chmod +x ci/deploy.sh
+    - ./ci/deploy.sh --environment production --version $VERSION
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  dependencies:
+    - build-images
+    - security-scan
+
+# Cleanup staging on merge request close
+cleanup-staging:
+  stage: deploy-staging
+  image: bitnami/kubectl:latest
+  variables:
+    ENVIRONMENT: staging
+  before_script:
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG_STAGING" | base64 -d > ~/.kube/config
+  script:
+    - chmod +x ci/deploy.sh
+    - ./ci/deploy.sh --environment staging --cleanup
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "close"
+  when: manual
+
+# Performance tests (optional)
+performance-tests:
+  stage: deploy-staging
+  image: grafana/k6:latest
+  variables:
+    API_URL: https://staging.k-scrape-nexus.com
+  script:
+    - |
+      cat > performance-test.js << 'EOF'
+      import http from 'k6/http';
+      import { check, sleep } from 'k6';
+
+      export let options = {
+        stages: [
+          { duration: '2m', target: 10 },
+          { duration: '5m', target: 10 },
+          { duration: '2m', target: 20 },
+          { duration: '5m', target: 20 },
+          { duration: '2m', target: 0 },
+        ],
+      };
+
+      export default function () {
+        let response = http.get(`${__ENV.API_URL}/health`);
+        check(response, {
+          'status is 200': (r) => r.status === 200,
+          'response time < 500ms': (r) => r.timings.duration < 500,
+        });
+        sleep(1);
+      }
+      EOF
+    - k6 run performance-test.js
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  dependencies:
+    - deploy-staging

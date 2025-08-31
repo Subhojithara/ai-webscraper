@@ -1,0 +1,125 @@
+{
+  "timestamp": "2025-08-31T04:41:39.976754",
+  "results": {
+    "routing": {
+      "passed": 11,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "AI Extraction Enabled",
+          "status": "passed"
+        },
+        {
+          "name": "LLM Strategy",
+          "status": "passed"
+        },
+        {
+          "name": "Cosine Strategy",
+          "status": "passed"
+        },
+        {
+          "name": "Complex Content",
+          "status": "passed"
+        },
+        {
+          "name": "Content Site with Smart Routing",
+          "status": "passed"
+        },
+        {
+          "name": "Blog Site with Smart Routing",
+          "status": "passed"
+        },
+        {
+          "name": "News Site with Smart Routing",
+          "status": "passed"
+        },
+        {
+          "name": "JavaScript Heavy Site",
+          "status": "passed"
+        },
+        {
+          "name": "React Application",
+          "status": "passed"
+        },
+        {
+          "name": "Regular HTTP Site",
+          "status": "passed"
+        },
+        {
+          "name": "API Endpoint",
+          "status": "passed"
+        }
+      ]
+    },
+    "features": {
+      "passed": 5,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "Basic Markdown Extraction",
+          "status": "passed"
+        },
+        {
+          "name": "LLM-based Extraction",
+          "status": "passed"
+        },
+        {
+          "name": "Cosine Similarity Extraction",
+          "status": "passed"
+        },
+        {
+          "name": "Custom Configuration",
+          "status": "passed"
+        },
+        {
+          "name": "Invalid Configuration - Missing LLM Config",
+          "status": "passed"
+        }
+      ]
+    },
+    "quality": {
+      "passed": 4,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "High Quality Content",
+          "status": "passed",
+          "score": 0.8300000000000001
+        },
+        {
+          "name": "Medium Quality Content",
+          "status": "passed",
+          "score": 0.5800000000000001
+        },
+        {
+          "name": "Low Quality Content",
+          "status": "passed",
+          "score": 0.3
+        },
+        {
+          "name": "Failed Extraction",
+          "status": "passed",
+          "score": 0.0
+        }
+      ]
+    },
+    "endpoints": {
+      "passed": 3,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "Health Endpoint",
+          "status": "passed"
+        },
+        {
+          "name": "Status Endpoint",
+          "status": "passed"
+        },
+        {
+          "name": "Basic Scraping",
+          "status": "passed"
+        }
+      ]
+    }
+  }
+}

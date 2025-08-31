@@ -1,0 +1,8 @@
+# K-Scrape Nexus HTTP Scraper Worker Dependencies
+
+httpx>=0.25.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+boto3>=1.34.0
+structlog>=23.2.0
+crawl4ai>=0.7.0
